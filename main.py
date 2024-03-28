@@ -1,6 +1,9 @@
+import json
 from selenium import webdriver
 from tempfile import mkdtemp
 from selenium.webdriver.common.by import By
+from selenium.webdriver import ActionChains
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
 
 
 def handler(event=None, context=None):
@@ -22,6 +25,30 @@ def handler(event=None, context=None):
     options.add_argument("--remote-debugging-port=9222")
 
     chrome = webdriver.Chrome(options=options, service=service)
-    chrome.get("https://example.com/")
+    print(event)
+    chrome.set_window_rect(width=800, height=600)
+    if event is None:
+        return {"nope":"nononoi"}
+    if "body" in event:
+        actions = json.loads(event['body']).get("actions", [])
+    else:
+        actions = event.get("actions", [])
+    responses = []
+    for a in actions:
+        print(a)
+        if a['command'] == "navigate":
+            chrome.get(a['url'])
+        elif a['command'] == 'screenshot':
+            pass
+        elif a['command'] == 'scroll':
+            action = ActionChains(chrome)
+            action.scroll_by_amount(int(a.get("scroll_x",0)), int(a.get("scroll_y", 0)))\
+                  .perform()
+        elif a['command'] == 'click':
+            action = ActionBuilder(chrome)
+            action.pointer_action.move_to_location(int(a["cursor_x"]), int(a["cursor_y"])).click()
+            action.perform()
 
-    return chrome.find_element(by=By.XPATH, value="//html").text
+        responses.append({"screen": chrome.get_screenshot_as_base64()})
+        
+    return {"responses": responses}
